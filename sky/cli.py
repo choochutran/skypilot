@@ -2710,6 +2710,17 @@ def admin_deploy(clusterspec_yaml: str):
                 fg='green')
 
 
+@admin.command('status', cls=_DocumentedCodeCommand)
+@usage_lib.entrypoint
+def admin_status():
+    """Show local clusters.
+
+    """
+    local_clusters = onprem_utils.check_and_get_local_clusters(
+    suppress_error=True)
+    status_utils.show_local_status_table(local_clusters)
+
+
 # Managed Spot CLIs
 def _is_spot_controller_up(
     stopped_message: str,

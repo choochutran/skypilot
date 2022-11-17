@@ -2729,6 +2729,57 @@ def admin_deploy(clusterspec_yaml: str):
                 fg='green')
 
 
+@admin.command('queue', cls=_DocumentedCodeCommand)
+@click.option('--skip-finished',
+              '-s',
+              default=False,
+              is_flag=True,
+              required=False,
+              help='Show only pending/running jobs\' information.')
+@click.argument('local_clusters',
+                required=False,
+                type=str,
+                nargs=-1,
+                **_get_shell_complete_args(_complete_cluster_name))
+@usage_lib.entrypoint
+def admin_queue(local_clusters: Tuple[str], skip_finished: bool):
+    """Show the job queue for local clusters"""
+    click.secho('Fetching and parsing job queue...', fg='yellow')
+
+    show_all_local = False
+    cluster_infos = global_user_state.get_clusters()
+    clusters = [c['name'] for c in cluster_infos]
+
+    if local_clusters:
+        local_clusters = _get_glob_clusters(local_clusters)
+    else:
+        show_all_local = True
+        local_clusters = onprem_utils.check_and_get_local_clusters()
+
+    # Fetch jobs on cluster(s) across all users
+    all_users = True
+    unsupported_clusters = []
+    for local_cluster in local_clusters:
+        try:
+            job_table = core.queue(local_cluster, skip_finished, all_users)
+        except exceptions.NotSupportedError as e:
+            unsupported_clusters.append(local_cluster)
+            click.echo(str(e))
+            continue
+        except (RuntimeError, exceptions.ClusterNotUpError) as e:
+            click.echo(str(e))
+            continue
+        job_table = job_lib.format_job_queue(job_table)
+        click.echo(f'\nJob queue of cluster {local_cluster}\n{job_table}')
+
+    for local_cluster in local_clusters:
+        if local_cluster not in clusters and show_all_local:
+            click.secho(
+                f'Local cluster {local_cluster} is uninitialized;'
+                ' skipped.',
+                fg='yellow')
+
+
 # Managed Spot CLIs
 def _is_spot_controller_up(
     stopped_message: str,
